@@ -79,22 +79,27 @@ private struct AestheticTextLayout: Layout {
     /// Performs a binary search to find the smallest width, up to a tuned precision,
     /// that does not affect the height (e.g., cause the text to wrap to another line).
     private func smallestSize(for subview: LayoutSubview, proposal: ProposedViewSize, sizeThatFits: CGSize) -> CGSize {
+        // Measure with an unconstrained height: under a finite height proposal, narrower widths
+        // truncate to the same height and look like they fit.
+        let naturalHeight = subview.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil)).height
+
+        // Already squeezed below its natural height, so narrowing would only truncate more.
+        guard sizeThatFits.height >= naturalHeight else {
+            return sizeThatFits
+        }
+
         var maxWidth = sizeThatFits.width
         // It will never make sense to wrap to less than half of the current width.
         var minWidth = maxWidth * 0.5
 
         // Get within 10% of the smallest possible size based on the range of possible sizes.
         let precision = max(1, (maxWidth - minWidth) * 0.1)
-        let naturualHeight = sizeThatFits.height
 
         while maxWidth - minWidth > precision {
             let midWidth = (minWidth + maxWidth) / 2
+            let testSize = subview.sizeThatFits(ProposedViewSize(width: midWidth, height: nil))
 
-            var testProposal = proposal
-            testProposal.width = midWidth
-            let testSize = subview.sizeThatFits(testProposal)
-
-            if testSize.height == naturualHeight {
+            if testSize.height <= naturalHeight {
                 // Shrink further
                 maxWidth = midWidth
             } else {
@@ -103,6 +108,6 @@ private struct AestheticTextLayout: Layout {
             }
         }
 
-        return CGSize(width: maxWidth, height: naturualHeight)
+        return CGSize(width: maxWidth, height: sizeThatFits.height)
     }
 }
